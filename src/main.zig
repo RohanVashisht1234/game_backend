@@ -1,7 +1,7 @@
 const std = @import("std");
 const zap = @import("zap");
 const eql = std.mem.eql;
-
+const alc = std.heap.c_allocator;
 const Player = struct {
     id: u32,
     online: bool = true,
@@ -16,12 +16,16 @@ const Player = struct {
 
     pub fn create(id: u32, user_name: []const u8, password: []const u8) Player {
         // Allocate fixed-size array to store the user_name and password slices
+        const user_name_dupe = alc.dupe(u8, user_name) catch @panic("RAM full");
+        const password_dupe = alc.dupe(u8, password) catch @panic("RAM full");
 
+        std.debug.print("\n{s}\n", .{user_name_dupe});
+        std.debug.print("\n{s}\n", .{password_dupe});
         return Player{
             .id = id,
             .room_id = null,
-            .user_name = user_name,
-            .password = password,
+            .user_name = user_name_dupe,
+            .password = password_dupe,
         };
     }
 
@@ -98,6 +102,8 @@ fn handleEnterRoom(r: zap.Request) !void {
                     return;
                 };
                 if (id >= players_index or !eql(u8, players[id].password, password)) {
+                    std.debug.print("\nGOT:{d}:{s}", .{ id, players[id].password });
+                    std.debug.print("\nEXPECTED:{d}:{s}", .{ players[0].id, players[0].password });
                     try r.sendBody("INVALID CREDENTIALS");
                     return;
                 }
