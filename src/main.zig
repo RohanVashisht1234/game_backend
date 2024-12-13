@@ -76,6 +76,12 @@ fn handleSignup(r: zap.Request) !void {
     if (r.query) |query| {
         var parts = std.mem.splitScalar(u8, query, ':');
         if (parts.next()) |user_name| {
+            for (players[0..players_index]) |player| {
+                if (eql(u8, player.user_name, user_name)) {
+                    try r.sendBody("USER ALREADY EXISTS");
+                    return;
+                }
+            }
             if (parts.next()) |password| {
                 const sanitized_user_name = if (user_name.len > 10) user_name[0..10] else user_name;
                 const sanitized_password = if (password.len > 10) password[0..10] else password;
@@ -88,6 +94,28 @@ fn handleSignup(r: zap.Request) !void {
         }
     }
     try r.sendBody("INVALID QUERY");
+}
+
+fn handleSignin(r: zap.Request) !void {
+    if (r.query) |query| {
+        var parts = std.mem.splitScalar(u8, query, ':');
+        if (parts.next()) |user_name| {
+            if (parts.next()) |password| {
+                if (user_name.len > 10 or password.len > 10) {
+                    try r.sendBody("WRONG CREDENTIALS");
+                    return;
+                }
+                for (players[0..players_index]) |player| {
+                    if (eql(u8, player.user_name, user_name) and eql(u8, player.password, password)) {
+                        var buf: [50]u8 = undefined;
+                        const res = try std.fmt.bufPrintZ(&buf, "{d}", .{player.id});
+                        try r.sendBody(res);
+                        return;
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn handleEnterRoom(r: zap.Request) !void {
@@ -215,8 +243,12 @@ fn handleGetCoordinates(r: zap.Request) !void {
 fn onRequest(r: zap.Request) void {
     std.debug.print("\n{any}\n", .{players[0..2]});
     if (r.path) |path| {
-        if (eql(u8, path, "/signup/")) {
+        if (eql(u8, path, "/")) {
+            r.sendFile("./a.html") catch return;
+        } else if (eql(u8, path, "/signup/")) {
             handleSignup(r) catch return;
+        } else if (eql(u8, path, "/signin/")) {
+            handleSignin(r) catch return;
         } else if (eql(u8, path, "/enter_room/")) {
             handleEnterRoom(r) catch return;
         } else if (eql(u8, path, "/set/")) {
